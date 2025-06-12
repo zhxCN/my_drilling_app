@@ -1,0 +1,57 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y openjdk-11-jdk git zip unzip libssl-dev libffi-dev python3-dev zlib1g-dev
+        pip install --upgrade buildozer cython virtualenv
+    
+    - name: Cache build dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          .buildozer
+          ~/.buildozer
+        key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
+    
+    - name: Configure build environment
+      run: |
+        # 生成唯一版本号
+        DATE=$(date +'%Y%m%d.%H%M')
+        echo "version = $DATE" >> buildozer.spec
+        
+        # 添加图标和启动画面配置
+        echo "presplash.filename = %(source.dir)s/presplash.png" >> buildozer.spec
+        echo "icon.filename = %(source.dir)s/well.ico" >> buildozer.spec
+        
+        # 设置Android SDK路径
+        echo "android.sdk_path = /home/runner/.buildozer/android/platform/android-sdk" >> buildozer.spec
+    
+    - name: Build APK
+      run: |
+        buildozer -v android debug
+        
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: drillingmonitor-apk
+        path: bin/*.apk
+        retention-days: 7
